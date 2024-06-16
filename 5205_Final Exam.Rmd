@@ -1,0 +1,437 @@
+---
+title: "5205_Final Exam_0427"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+# Section 1: Dimension Reduction
+
+Question 1
+Review each of the six features respondents rated. Group the features into distinct factors based on their meaning. Next, describe each factor. Limit your answer to 6 lines.
+
+```{r}
+setwd('/Users/emilyziyixiao/DataspellProjects/Framework&Method2/')
+
+data1 = read.csv('survey_factors.csv')
+data1
+```
+
+Question 2/3
+Conduct Bartlett’s Test of Sphericity and KMO’s Measure of Sampling Adequacy on the six features in the survey data. Is the data suitable for Factor Analysis?
+
+```{r}
+library(psych)
+library(ggplot2)
+cortest.bartlett(cor(survey))
+KMO (r = cor(survey))
+```
+
+Question 4/5
+Examine a scree plot of the survey data. What is the ideal number of factors?
+
+```{r}
+scree(cor(survey),factors = T, pc=T)
+```
+
+Question 6/7/8
+What is the eigen value of the first factor?
+
+```{r}
+data.frame(factor = 1:ncol(survey), eigen = eigen(cor(survey))$values)
+```
+
+Question 9/10
+Which of the following features have a communality that is acceptable (>0.5)? Select one or more correct answers. 
+
+```{r}
+result = fa(r = survey,nfactors = 2,fm = 'pa',rotate = 'none')
+result$Vaccounted
+data.frame(communality = result$communality)
+```
+
+Question 11/12
+Conduct a factor analysis with oblimin rotation to extract two factors. Examine the pattern of loadings to identify the factor each feature corresponds to. What is the loading of “high_quality” on the factor it corresponds to?
+```{r}
+factor_oblimin = fa(r = survey,nfactors = 2,fm = 'pa',rotate = 'oblimin')
+print(factor_oblimin$loadings)
+```
+
+Question 13
+Select all other features that load on to the same factor as “high_quality”? Select one or more correct answers. 
+```{r}
+#print(factor_oblimin$loadings, sort=T)
+fa.diagram(factor_oblimin,sort = T)
+```
+
+Question 15/16
+Examine the results of the factor analysis conducted above (i.e., factor analysis with oblimin rotation to extract two factors). What is the loading of “economical” on the factor it corresponds to?
+
+```{r}
+fa.diagram(factor_oblimin,sort = T)
+```
+
+Question 17/18
+Select all other features that load on to the same factor as “economical”? Select one or more correct answers. 
+
+```{r}
+factor_oblimin = fa(r = survey,nfactors = 2,fm = 'pa',rotate = 'oblimin')
+print(factor_oblimin$loadings, sort=T)
+```
+
+
+
+
+
+
+# Section 2: Text Mining
+
+```{r}
+library(dplyr); library(magrittr)
+library(ggplot2); library(ggthemes)
+library(stringr)
+```
+
+```{r}
+install.packages('tidytext')
+library(tidytext)
+install.packages('lexicon')
+library(lexicon)
+install.packages('tidyr')
+library(tidyr)
+install.packages("wordcloud")
+library(wordcloud)
+install.packages("tm")
+library(tm)
+install.packages("rpart")
+library(rpart); library(rpart.plot)
+```
+
+Question 19/20
+What is the average length of reviews in terms of number of characters?
+```{r}
+setwd('/Users/liandi/Desktop/5205_Final Exam_Data')
+beauty = read.csv('beauty.csv')
+
+summary(nchar(beauty$review))
+mean(nchar(beauty$review))
+
+```
+
+Question 21/22
+What is the median number of words in reviews?
+```{r}
+summary(str_count(string = beauty$review,pattern = '\\S+'))
+median(str_count(string = beauty$review,pattern = '\\S+'))
+```
+
+Question 23/24
+Which of the following words are among the top 10 words mentioned in the reviews? Select one or more answers that are correct.  
+```{r}
+library(dplyr); library(tidytext); library(magrittr)
+beauty%>%
+  unnest_tokens(input = review, output = word)%>%
+  select(word)%>%
+  group_by(word)%>%
+  summarize(count = n())%>%
+  ungroup()%>%
+  arrange(desc(count))%>%
+  top_n(10)
+```
+
+Question 25/26
+Use the ‘bing’ dictionary to classify words in reviews into positive and negative. The bing dictionary of words can be accessed using tidytext::get_sentiments(‘bing’). What is the average number of positive words in a review?
+
+```{r}
+as.data.frame(get_sentiments('bing'))[1:50,]
+beauty%>%
+  group_by(id)%>%
+  unnest_tokens(output = word, input = review)%>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  count()
+```
+
+Question 27/28
+Use the ‘bing’ dictionary to classify words in reviews into positive and negative. The bing dictionary of words can be accessed using tidytext::get_sentiments(‘bing’). What is the average number of negative words in a review?
+```{r}
+as.data.frame(get_sentiments('bing'))[1:50,]
+beauty%>%
+  group_by(id)%>%
+  unnest_tokens(output = word, input = review)%>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  count()
+```
+
+Question 29/30
+Examine the emotions expressed in the reviews using the “nrc” dictionary. The nrc dictionary can be accessed using tidytext::get_sentiments(‘nrc’) OR by reading nrc.csvDownload nrc.csv  into an R object.
+
+How many words reflect “joy”?
+
+```{r}
+#install.packages('textdata')
+#library(textdata)
+#as.data.frame(get_sentiments('nrc'))[1:50,]
+#beauty%>%
+#  group_by(id)%>%
+#  unnest_tokens(output = word, input = review)%>%
+#  inner_join(get_sentiments('nrc'))%>%
+#  group_by(sentiment)%>%
+#  count()
+
+```
+
+```{r}
+nrc = read.csv('nrc.csv')
+
+beauty%>%
+  group_by(id)%>%
+  unnest_tokens(output = word, input = review)%>%
+  inner_join(nrc)%>%
+  group_by(sentiment)%>%
+  count()%>%
+  arrange(desc(n))
+```
+
+Question 31/32
+Use the afinn dictionary to determine the sentiment score of each review. The afinn dictionary can be accessed using tidytext::get_sentiments(‘afinn’) OR by reading afinn.csvDownload afinn.csv into an R object.
+
+Compute the sentiment score for each review. Next, average the sentiment of all reviews. What is the average sentiment score for a review?
+
+```{r}
+afinn = read.csv('afinn.csv')
+
+beauty %>%
+  select(id,review)%>%
+  group_by(id)%>%
+  unnest_tokens(output=word,input=review)%>%
+  inner_join(afinn)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  summarize(min=min(reviewSentiment),
+            max=max(reviewSentiment),
+            median=median(reviewSentiment),
+            mean=mean(reviewSentiment))
+```
+
+# Section 3 Recommender Systems
+
+```{r}
+library(recommenderlab)
+data(MovieLense)
+```
+
+Question 34
+Briefly outline the process underlying collaborative filtering. Limit your answer to three lines.
+```{r}
+# 1. The user express his/her preference by rating system; 2. The system matches the user's ratings with other users to find people with similar tastes；3. Recommend item that rated highly but not yet being rated by this users
+```
+
+Question 35
+How many movies did user “33” rate?
+
+```{r}
+nratings(MovieLense['33',])
+```
+
+Question 37/38
+What was the mean rating of movies by user “33”?
+
+```{r}
+mean(getRatings(MovieLense['33']))
+```
+
+Question 39/40
+Using a seed of 1706, split the dataset, retaining 80% in the train sample using the sample() function. Call the object containing the train data, train and the object containing the test data, test.How many rows are in the train dataset?
+```{r}
+set.seed(1706)
+split = sample(x = nrow(MovieLense), size = 0.8 * nrow(MovieLense))
+train = MovieLense[split,]
+test = MovieLense[-split,]
+nrow(train)
+```
+
+Question 41/42
+Construct a user-based collaborative filtering recommender using the train data. Set the parameter nn to 10, method to ‘cosine’, and normalize to ‘center’ in the recommender function. Call this recommender, recom_ubcf. Use recom_ubcf to predict the top three recommended movies for each user in the test data. What are the top three recommended movies for user “33”?
+
+```{r}
+recom_ubcf = Recommender(
+  train,
+  method = 'UBCF',
+  parameter = list(
+    method = 'cosine',
+    nn = 10,
+    normalize = 'center'
+  )
+)
+pred_ubcf_top3 = predict(recom_ubcf,
+                         newdata = test,
+                         method = 'topNList',
+                         n = 3)
+
+getList(pred_ubcf_top3)['33']
+
+
+```
+
+Question 43/44
+Based on the user-based collaborative filtering recommender, recom_ubcf that was constructed in the previous question, what is the predicted rating for the top recommended movie for user “33”?
+
+```{r}
+as(pred_ubcf_top3,'matrix')['33',"Muppet Treasure Island (1996)"]
+```
+
+Question 45/46
+One of the oldest approaches to recommendations involves recommending the most popular item. Although less widely used today, we still see this in the form of Top 50 Music Hits, Billboard Top Hits, and New York Times Bestsellers. The underlying assumption is that if most people like a movie, a book or a song, you will like it too.
+
+Create non-personalized recommendations with the POPULAR method using the train data. Set the parameter normalize to ‘center’ (although, center is the default). Call this recommender, recom_popular. Use recom_popular to predict the top 3 recommended movies for each user in the test data. Based on the results, what are the top 3 recommended movies for user ‘33’?
+
+```{r}
+recom_popular = Recommender(train,
+                            method = 'POPULAR',
+                            parameter = list(normalize = 'center'))
+pred_popular_top3 = predict(recom_popular,
+                            newdata = test,
+                            type = 'topNList',
+                            n = 3)
+getList(pred_popular_top3)['33']
+```
+
+
+
+
+# Section 4 Time Series Analysis
+
+```{r}
+library(ggplot2);library(ggthemes);library(gridExtra)  # For plots
+library(quantmod);library(xts);library(zoo) # For using xts class objects
+library(forecast) # Set of forecasting functions
+library(fpp); library(fpp2) # Datasets from Forecasting text by Rob Hyndman
+library(tseries) # for a statistical test
+library(dplyr) # Data wrangling
+
+```
+
+Question 48/49
+For the remaining questions in this section that involve analysis, use a dataset containing monthly closing prices for Apple Stock. Read the data in apple.rds using readRDS as follows: readRDS(file=‘apple.RDS’).
+
+The goal is to forecast Apple stock starting in 2019 using all historical data up until the end of 2018 in the Apple stock data. To do this set, split Apple data into train and test such that train data ends on Dec, 2018 and test data begins on Jan, 2019. Call the train data, train and test data, test.
+
+How many quarters are in the test dataset?
+
+```{r}
+apple = readRDS(file='apple.RDS')
+train = window(apple,end=c(2018,12))
+test = window(apple,start=c(2019,01))
+test
+length(test)/3
+
+```
+
+Question 50/51
+Use the “drift” method to make predictions over the test data. What is the point forecast for Dec, 2021?
+
+```{r}
+drift_model = rwf(train,h=36,drift = T)
+drift_model$mean
+window(drift_model$mean,c(2021,12))
+
+```
+
+Question 52/53
+Examine the accuracy of the above prediction from drift method on the train sample. What is the Root Mean Squared Error(RMSE) of the predictions in the train sample?
+
+```{r}
+accuracy(drift_model)
+```
+
+Question 54/55
+What is the RMSE of the drift method in the test data?
+
+```{r}
+accuracy(drift_model, x = apple)
+```
+
+Question 56/57
+
+Next, use a Simple Exponential Smoothing model to make forecasts over the test data. What is the point forecast for Dec, 2021?
+
+```{r}
+ses_model = ses(train,h = 36)
+ses_model$mean
+window(ses_model$mean,c(2021,12))
+```
+
+Question 58/59
+
+Exponential Smoothing models can be represented using a three-letter model form. Which of the following models represent a Simple Exponential Smoothing model with additive errors.
+
+```{r}
+# ANN
+# The reason why choose ANN is that for A, the first component can show the errors should be additive. For NN, simple exponential smoothing model has no trend component and seasonal component with.
+```
+
+Question 60/61
+For the train data, which of the following ETS models has the lowest AICc? Do not specify the “damped” argument.
+```{r}
+# MAN
+
+ets_ann = ets(train,model = 'ANN')
+summary(ets_ann)
+# 908.0735
+ets_aan = ets(train,model = 'AAN')
+summary(ets_aan)
+# 909.8665
+ets_man = ets(train,model = 'MAN')
+summary(ets_man)
+# 808.0006
+ets_mmn = ets(train,model = 'MMN')
+summary(ets_mmn)
+# 810.8902
+
+```
+
+Question 62/63
+Use the ETS Model, “MAN” to fit the train data. Based on this model, what is the point forecast for Dec. 2021?
+
+```{r}
+ets_man = ets(train,model = 'MAN')
+ets_man_forecast = forecast(ets_man,h=36)
+ets_man_forecast$mean
+window(ets_man_forecast$mean,c(2021,12))
+```
+
+Question 64/65
+
+What is the RMSE of the forecast from the above model in the test sample?
+
+```{r}
+accuracy(ets_man_forecast, x = apple)
+```
+
+
+
+
