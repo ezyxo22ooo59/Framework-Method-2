@@ -1,6 +1,6 @@
 # Framework-Method-2
 
-## Automated Wine Recommendation
+## Final Project: Automated Wine Recommendation
 
 ### Project Overview:
 This project focuses on creating an automated wine recommendation system to address challenges faced by consumers in selecting wines. The project was conducted by a group of students to explore data-driven methods for improving wine recommendations based on consumer reviews and sentiment analysis.
