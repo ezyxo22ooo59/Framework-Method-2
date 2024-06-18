@@ -1,0 +1,320 @@
+---
+title: "Apan505_Final"
+author: "Zach Chan"
+date: "4/15/2022"
+output: html_document
+---
+```{r}
+install.packages("wordcloud2")
+```
+```{r setup, include=FALSE}
+library(dplyr);library(tidytext);library(tidyr);library(wordcloud);library(ggplot2);library(RColorBrewer);library(wordcloud2);library(tm)
+
+setwd('C:/Users/zacha/Desktop/School/Spring 2022/Apan 5205 Frameworks & Methods 2')
+tweet_words = read.csv('tweet_words.csv')
+hashtag_words = read.csv('hashtag_words.csv')
+```
+
+```{r,tweet w}
+#Top200 Common Words
+df = hashtag_words%>%
+  unnest_tokens(input = word, output = word)%>%
+  select(word)%>%
+  anti_join(stop_words)%>%
+  group_by(word)%>%
+  summarize(count = n())%>%
+  ungroup()%>%
+  arrange(desc(count))%>%
+  top_n(200)
+df
+```
+```{r tweet,first filter}
+df = df[df$word != 'ð' &
+          df$word != 'russiaukrainewar' &
+          df$word != 'https',]
+df
+```
+```{r tweet,first filter}
+top_twenty = df %>%
+  mutate(percent=signif(count/6288 *100,digit=2)) %>%
+  top_n(25)
+top_twenty
+
+```
+```{r tweet,first filter}
+ggplot(top_twenty,aes(x=reorder(word,percent),y=percent))+
+  geom_col(fill='#0099f9')+
+  labs(
+    title = "Top Twenty Associated Hashtags"
+  )+
+  coord_flip()
+```
+
+```{r tweet,filter}
+df2 = df[df$word != 'ukraine' &
+          df$word != 'ukrainerussia' &
+          df$word != 'russia' &
+          df$word != 'russia' &
+          df$word != 'russian' &
+          df$word != 'ukraineinvasion' &
+          df$word != 'russiaukraine' &
+          df$word != 'ukrainian' &
+          df$word != 'ukrainewar' &
+          df$word != 'ukrainian' &
+          df$word != 'russianinvasion' &
+          df$word != 't.co' &
+          df$word != 'ukrainerussia' &
+          df$word != 'ð' &
+          df$word != 'https',]
+df2
+```
+
+```{r,hashtags,common}
+#Top200 Common Words
+df2 = hashtag_words%>%
+  unnest_tokens(input = word, output = word)%>%
+  select(word)%>%
+  anti_join(stop_words)%>%
+  group_by(word)%>%
+  summarize(count = n())%>%
+  ungroup()%>%
+  arrange(desc(count))%>%
+  top_n(200)
+
+df2
+```
+
+```{r,hastags filterd}
+df2 = df2[df2$word != 'russiaukrainewar' &
+          df2$word != 'russiaukraineconflict' &
+          df2$word != 'à' &
+          df2$word != 'ù' &
+          df2$word != 'ø' &
+          df2$word != 'ð' &
+          df2$word != 'https',]
+df2
+```
+
+```{r, word cloud}
+
+wordcloud(words = df2$word, freq = df2$count, min.freq = 100,
+          max.words=200, random.order=FALSE, rot.per=0.35,
+          colors=brewer.pal(8, "Dark2"))
+```
+
+```{r df2, filtered}
+df
+df_filtered = df$word[df$word != 'ukraine' &
+            df$word != 'ukrainerussia' &
+            df$word != 'russia' &
+            df$word != 'russiaukraine' &
+            df$word != 'ukraineunderattack' &
+            df$word != 'ukraineinvasion' &
+            df$word != 'russianinvasion' &
+            df$word != 'russiainvadedukraine' &
+            df$word != 'russian' &
+            df$word != 'russiaukraine' &
+            df$word != 'ukraineunderattack' &
+            df$word != 'russiaukrainecrisis' &
+            df$word != 'russiaukrainecrisis' &
+            df$word != 'ukrainerussiaconflict' &
+            df$word != 'ukrainian' &
+            df$word != 'ukraina' &
+            df$word != 'warinukraine' &
+            df$word != 'russiainvadesukraine' &
+            df$word != 'ukrainerussiacrisis' &
+            df$word != 'ukrainecrisis' &
+            df$word != 'websitedesign' &
+            df$word != 'fridayfeeling' &
+            df$word != 'ukrainewar',]
+```
+
+```{r, word cloud}
+
+wordcloud(words = df3$word, freq = df2$count, min.freq = 100,
+          max.words=200, random.order=FALSE, rot.per=0.35,
+          colors=brewer.pal(8, "Dark2"))
+```
+
+```{r, sentiment analysis}
+hashtag_words %>%
+  group_by(screen_name) %>%
+  unnest_tokens(output = word, input = word) %>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)
+```
+```{r, sentiment analysis}
+hashtag_words %>%
+  group_by(screen_name) %>%
+  unnest_tokens(output = word, input = word) %>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  count()
+```
+```{r, sentiment analysis}
+library(ggplot2); library(ggthemes)
+hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  count()%>%
+  ggplot(aes(x=sentiment,y=n,fill=sentiment))+
+  geom_col()+
+  theme_economist()+
+  guides(fill=F)+
+  coord_flip()
+```
+```{r, sentiment analysis}
+afinn = get_sentiments('afinn')
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(afinn)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  summarize(min=min(reviewSentiment),
+            max=max(reviewSentiment),
+            median=median(reviewSentiment),
+            mean=mean(reviewSentiment))
+
+
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(afinn)%>%
+  group_by(value)%>%
+  count()%>%
+  ggplot(aes(x=value,y=n,fill=value))+
+  geom_col()+
+  theme_economist()+
+  guides(fill=F)+
+  coord_flip()
+```
+
+```{r, sentiment analysis}
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(afinn)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  ggplot(aes(x=reviewSentiment,fill=reviewSentiment>0))+
+  geom_histogram(binwidth = 0.1)+
+  scale_x_continuous(breaks=seq(-5,5,1))+
+  scale_fill_manual(values=c('tomato','seagreen'))+
+  guides(fill=F)+
+  theme_wsj()
+```
+```{r, sentiment analysis}
+library(lexicon)
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(key_sentiment_jockers)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  summarize(min=min(reviewSentiment),max=max(reviewSentiment),median=median(reviewSentiment),mean=mean(reviewSentiment))
+```
+
+```{r, sentiment analysis}
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(key_sentiment_jockers)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  ggplot(aes(x=reviewSentiment,fill=reviewSentiment>0))+
+  geom_histogram(binwidth = 0.02)+
+  scale_x_continuous(breaks=seq(-1,1,0.2))+
+  scale_fill_manual(values=c('tomato','seagreen'))+
+  guides(fill=F)+
+  theme_wsj()
+```
+```{r, sentiment analysis}
+library(tidyr)
+wordcloudData = 
+  hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  ungroup()%>%
+  select(screen_name,word)%>%
+  anti_join(stop_words)%>%
+  inner_join(get_sentiments('bing'))%>%
+  ungroup()%>%
+  count(sentiment,word,sort=T)%>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0)%>%
+  data.frame()
+rownames(wordcloudData) = wordcloudData[,'word']
+wordcloudData = wordcloudData[,c('positive','negative')]
+set.seed(1)
+comparison.cloud(term.matrix = wordcloudData,scale = c(2,0.5),max.words = 200, rot.per=0)
+```
+
+```{r, sentiment analysis}
+nrc = get_sentiments('nrc')
+wordcloudData = 
+  hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  ungroup()%>%
+  select(screen_name,word)%>%
+  anti_join(stop_words)%>%
+  inner_join(nrc)%>%
+  ungroup()%>%
+  count(sentiment,word,sort=T)%>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0)%>%
+  data.frame()
+rownames(wordcloudData) = wordcloudData[,'word']
+wordcloudData = wordcloudData[,c('positive','negative')]
+set.seed(617)
+comparison.cloud(term.matrix = wordcloudData,scale = c(2,0.5),max.words = 200, rot.per=0)
+```
+```{r, sentiment analysis}
+hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(nrc)%>%
+  group_by(sentiment)%>%
+  count()%>%
+  arrange(desc(n))
+```
+```{r, sentiment analysis}
+library(lexicon)
+hashtag_words %>%
+  select(screen_name, word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(y = hash_sentiment_nrc,by = c('word'='x'))%>%
+  ungroup()%>%
+  group_by(y)%>%
+  summarize(count = n())%>%
+  ungroup()
+```
+```{r, sentiment analysis}
+library(syuzhet)
+library(plotly)
+emotions = get_nrc_sentiment(df$word)
+emo_bar = colSums(emotions)
+emo_sum = data.frame(count=emo_bar, emotion=names(emo_bar))
+emo_sum$emotion = factor(emo_sum$emotion, levels=emo_sum$emotion[order(emo_sum$count, decreasing = TRUE)])
+
+plot_ly(emo_sum, x=~emotion, y=~count, type="bar", color=~emotion) %>%
+  layout(xaxis=list(title=""), showlegend=FALSE,
+         title="Distribution of emotion categories for Hashtags")
+```
+```{r, sentiment analysis}
+hashtag_words %>%
+  select(word)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(afinn)%>%
+  summarize(overall_sentiment = mean(value))
+```
+```{r, sentiment analysis}
+
+```

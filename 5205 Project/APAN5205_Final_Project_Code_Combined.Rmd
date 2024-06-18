@@ -1,0 +1,412 @@
+---
+title: "Twitter Analysis for Russian Ukraine War Final Project Code"
+author: "Andi Li, Daisy Huang, Jingjing Yang, Yan Qin, Zachary Chan"
+date: "4/18/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr);library(tidytext);library(tidyr);library(wordcloud);library(ggplot2);library(RColorBrewer);
+library(wordcloud2);library(tm);library(SnowballC);library(textdata)
+library(magrittr)
+library(textclean)
+library(topicmodels)
+library(ggplot2);library(rtweet)
+
+setwd('C:/Users/zacha/Desktop/School/Spring 2022/Apan 5205 Frameworks & Methods 2')
+hashtag_words = read.csv('hashtag_words.csv')
+tweet_words = read.csv('tweet_words.csv')
+tweet1 = read_twitter_csv("raw_data-1.csv")
+```
+
+#Sentiment Analysis
+
+```{r}
+#Valence in tweets
+tweet_words %>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  count()
+```
+
+```{r}
+#Proportion
+tweet_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  ungroup()%>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  summarize(n = n())%>%
+  mutate(proportion = n/sum(n))
+```
+```{r}
+#Visualize results
+tweet_words %>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  count()%>%
+  ggplot(aes(x=sentiment,y=n,fill=sentiment))+
+  geom_col()+
+  guides(fill=F)+
+  coord_flip()
+```
+```{r}
+#afinn
+afinn = read.table('https://raw.githubusercontent.com/pseudorational/data/master/AFINN-111.txt',header = F,sep = '\t',col.names = c('word','value'))
+
+#Scores all words
+tweet_words %>%
+  inner_join(afinn,by = 'word')%>%
+  select('value')%>%
+  ggplot(aes(x=value))+geom_histogram()
+```
+```{r}
+#Score each tweet
+tweet_words %>%
+  left_join(afinn,by = 'word')%>%
+  group_by(screen_name)%>%
+  summarize(value = mean(value,na.rm=T))%>%
+  ungroup()%>%
+  select('screen_name','value')%>%
+  ggplot(aes(x=value))+geom_histogram()
+```
+```{r}
+#Sentiment score
+tweet_words %>%
+  inner_join(afinn,by = 'word')%>%
+  group_by(screen_name)%>%
+  summarize(tweet_sentiment = mean(value,na.rm=T))%>%
+  ungroup()
+```
+```{r}
+#Overall sentiment score
+tweet_words %>%
+  inner_join(afinn,by = 'word')%>%
+  group_by(screen_name)%>%
+  summarize(tweet_sentiment = mean(value,na.rm=T))%>%
+  ungroup()%>%
+  summarize(Overall_Sentiment=mean(tweet_sentiment,na.rm=T))
+```
+```{r}
+#nrc
+nrc = read.table(file = 'https://raw.githubusercontent.com/pseudorational/data/master/nrc_lexicon.txt',header = F,col.names = c('word','sentiment','num'),sep = '\t'); nrc = nrc[nrc$num!=0,]; nrc$num = NULL
+
+nrc%>%
+  group_by(sentiment)%>%
+  count()
+```
+```{r}
+#Emotions in Tweets
+tweet_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(nrc)%>%
+  group_by(sentiment)%>%
+  count()%>%
+  arrange(desc(n))
+```
+```{r}
+#Visualizing Emotions in Tweets
+tweet_words %>%
+  inner_join(get_sentiments('nrc'),by = 'word')%>%
+  select('sentiment')%>%
+  group_by(sentiment)%>%
+  summarize(freq=n())%>%
+  ungroup() %>%
+  ggplot(aes(x=reorder(sentiment,freq),y=freq,fill=freq))+geom_bar(position='dodge',stat='identity')+xlab('Sentiment')+ylab('Frequency')+coord_flip()
+```
+```{r}
+#A Word Cloud
+wordcloud_data= 
+  tweet_words %>%
+  anti_join(rbind(stop_words,'war','russiaukrainewar','ukraine','russia','ukrainerussia','ukraineunderattack','russiaukraineconflict','russian','ukraineinvasion','russiaukraine','ukrainewar','ukrainian','ukrainerussiaconflict','russiainvadedukraine','russianinvasion','ukraina','https','t.co'),by = 'word')%>%
+  count(word,sort=T)%>%
+  ungroup()
+wordcloud_data= as.data.frame(wordcloud_data)
+
+wordcloud(words = wordcloud_data$word,wordcloud_data$n,scale=c(2,0.5),max.words = 150,colors=brewer.pal(9,"Spectral"))
+```
+```{r}
+#Top 10 mentioned words
+wordcloud_data[1:10,]
+```
+```{r}
+#Comparing Positive and Negative
+wordcloud_data= 
+  tweet_words %>%
+  anti_join(rbind(stop_words,c('war','russiaukrainewar','ukraine','russia','ukrainerussia','ukraineunderattack','russiaukraineconflict','russian','ukraineinvasion','russiaukraine','ukrainewar','ukrainian','ukrainerussiaconflict','russiainvadedukraine','russianinvasion','ukraina','https','t.co')),by = 'word')%>%
+  inner_join(get_sentiments('bing'),by='word')%>%
+  count(sentiment,word,sort=T)%>%
+  ungroup()%>%
+  spread(key = sentiment,value = 'n',fill = 0)
+wordcloud_data= as.data.frame(wordcloud_data)
+rownames(wordcloud_data) = wordcloud_data[,'word']
+wordcloud_data = wordcloud_data[,c('positive','negative')]
+comparison.cloud(wordcloud_data,scale=c(2,0.5),max.words = 150,rot.per = 0)
+```
+#HashTag Data
+```{r}
+#Top200 Common Words
+df = hashtag_words%>%
+  unnest_tokens(input = word, output = word)%>%
+  select(word)%>%
+  anti_join(stop_words)%>%
+  group_by(word)%>%
+  summarize(count = n())%>%
+  ungroup()%>%
+  arrange(desc(count))%>%
+  top_n(200)
+```
+```{r}
+#removing orginal hashtag and random letters
+df = df[df$word != 'ð' &
+          df$word != 'russiaukrainewar' &
+          df$word != 'https',]
+#top twenty associated hashtags with percentage of occurrence (6,288 occurences of orginal hashtag #russiaukrainewar)
+top_twenty = df %>%
+  mutate(percent=signif(count/6288 *100,digit=2)) %>%
+  top_n(20)
+top_twenty
+```
+```{r}
+#bar graph for top twenty
+ggplot(top_twenty,aes(x=reorder(word,percent),y=percent))+
+  geom_col(fill='#0099f9')+
+  labs(
+    title = "Top Twenty Associated Hashtags"
+  )+
+  coord_flip()
+```
+```{r}
+#orginal word cloud (nothing removed)
+wordcloud(words = df$word, freq = df$count, min.freq = 100,
+          max.words=200, random.order=FALSE, rot.per=0.35,
+          colors=brewer.pal(8, "Dark2"))
+```
+```{r}
+#second word cloud (filtered with ukraine/russia removed)
+df_filtered = df[df$word != 'ukraine' &
+            df$word != 'ukrainerussia' &
+            df$word != 'russia' &
+            df$word != 'russiaukraine' &
+            df$word != 'ukraineunderattack' &
+            df$word != 'ukraineinvasion' &
+            df$word != 'russianinvasion' &
+            df$word != 'russiainvadedukraine' &
+            df$word != 'russian' &
+            df$word != 'russiaukraine' &
+            df$word != 'ukraineunderattack' &
+            df$word != 'russiaukrainecrisis' &
+            df$word != 'russiaukrainecrisis' &
+            df$word != 'ukrainerussiaconflict' &
+            df$word != 'ukrainian' &
+            df$word != 'ukraina' &
+            df$word != 'warinukraine' &
+            df$word != 'russiainvadesukraine' &
+            df$word != 'ukrainerussiacrisis' &
+            df$word != 'ukrainecrisis' &
+            df$word != 'websitedesign' &
+            df$word != 'fridayfeeling' &
+            df$word != 'ukrainewar',]
+
+wordcloud(words = df_filtered$word, freq = df_filtered$count, min.freq = 100,
+          max.words=200, random.order=FALSE, rot.per=0.35,
+          colors=brewer.pal(8, "Dark2"))
+```
+```{r}
+#bing sentiment
+hashtag_words %>%
+  group_by(screen_name) %>%
+  unnest_tokens(output = word, input = word) %>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  count()
+```
+```{r}
+#bing bar graph visual
+library(ggplot2); library(ggthemes)
+hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(get_sentiments('bing'))%>%
+  group_by(sentiment)%>%
+  count()%>%
+  ggplot(aes(x=sentiment,y=n,fill=sentiment))+
+  geom_col()+
+  theme_economist()+
+  guides(fill=F)+
+  coord_flip()
+```
+```{r}
+#bing word cloud
+
+library(tidyr)
+wordcloudData = 
+  hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  ungroup()%>%
+  select(screen_name,word)%>%
+  anti_join(stop_words)%>%
+  inner_join(get_sentiments('bing'))%>%
+  ungroup()%>%
+  count(sentiment,word,sort=T)%>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0)%>%
+  data.frame()
+rownames(wordcloudData) = wordcloudData[,'word']
+wordcloudData = wordcloudData[,c('positive','negative')]
+set.seed(617)
+comparison.cloud(term.matrix = wordcloudData,scale = c(2,0.5),max.words = 200, rot.per=0)
+
+```
+```{r}
+nrc = get_sentiments('nrc')
+
+hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(nrc)%>%
+  group_by(sentiment)%>%
+  count()%>%
+  arrange(desc(n))
+```
+```{r}
+#nrc by ranked emotions
+hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output = word, input = word)%>%
+  inner_join(nrc)%>%
+  group_by(sentiment)%>%
+  count()%>%
+  arrange(desc(n))
+```
+```{r}
+#nrc word cloud
+
+wordcloudData = 
+  hashtag_words%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  ungroup()%>%
+  select(screen_name,word)%>%
+  anti_join(stop_words)%>%
+  inner_join(nrc)%>%
+  ungroup()%>%
+  count(sentiment,word,sort=T)%>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0)%>%
+  data.frame()
+rownames(wordcloudData) = wordcloudData[,'word']
+wordcloudData = wordcloudData[,c('positive','negative')]
+set.seed(617)
+comparison.cloud(term.matrix = wordcloudData,scale = c(2,0.5),max.words = 200, rot.per=0)
+
+```
+```{r}
+afinn = get_sentiments('afinn')
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(afinn)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  summarize(min=min(reviewSentiment),
+            max=max(reviewSentiment),
+            median=median(reviewSentiment),
+            mean=mean(reviewSentiment))
+```
+```{r}
+#afinn visual
+
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(afinn)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  ggplot(aes(x=reviewSentiment,fill=reviewSentiment>0))+
+  geom_histogram(binwidth = 0.1)+
+  scale_x_continuous(breaks=seq(-5,5,1))+
+  scale_fill_manual(values=c('tomato','seagreen'))+
+  guides(fill=F)+
+  theme_wsj()+
+  labs(title="Afinn Sentiment Score")
+```
+```{r}
+#jockers
+
+library(lexicon)
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(key_sentiment_jockers)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  summarize(min=min(reviewSentiment),max=max(reviewSentiment),median=median(reviewSentiment),mean=mean(reviewSentiment))
+
+```
+```{r}
+#jockers visual
+
+hashtag_words %>%
+  select(screen_name,word)%>%
+  group_by(screen_name)%>%
+  unnest_tokens(output=word,input=word)%>%
+  inner_join(key_sentiment_jockers)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  ggplot(aes(x=reviewSentiment,fill=reviewSentiment>0))+
+  geom_histogram(binwidth = 0.02)+
+  scale_x_continuous(breaks=seq(-1,1,0.2))+
+  scale_fill_manual(values=c('tomato','seagreen'))+
+  guides(fill=F)+
+  theme_wsj()+
+  labs(title="Jockers Sentiment Score")
+```
+```{r}
+#Filter only English tweets
+eng_tweet = tweet1 %>%
+  filter(lang == 'en')
+
+# select column and remove NA - using country
+eng_tweet_country <- eng_tweet[, c("user_id", "country")]
+eng_tweet_country_removeNA <- na.omit(eng_tweet_country) 
+nrow(eng_tweet_country_removeNA) #nrow 169
+```
+```{r}
+country_table <- eng_tweet_country_removeNA %>% group_by(country) %>%tally()
+names(country_table)[1] <- 'region'
+names(country_table)[2] <- 'tweets'
+
+country_table$region[country_table$region == "United States"] <- "USA"
+country_table$region[country_table$region == "United Kingdom"] <- "UK"
+country_table$region[country_table$region == "Kingdom of Saudi Arabia"] <- "Saudi Arabia"
+country_table$region[country_table$region == "Slovak Republic"] <- "Slovakia"
+country_table$region[country_table$region == "The Netherlands"] <- "Netherlands"
+country_table['perc_tweets'] <- country_table$tweets/sum(country_table$tweets)
+```
+```{r}
+mapdata <- map_data('world')
+mapdata1 <- left_join(mapdata, country_table, by = "region")
+map1 <- ggplot(mapdata1, aes(x = long, y = lat, group = group))+
+  geom_polygon(aes(fill = perc_tweets), color = "gray")
+map2 <- map1 + scale_fill_gradient(name = "% of tweets", low = "steelblue1", high = "steelblue4", na.value = "gray85")+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        rect = element_blank())
+map2
+```
+
+
